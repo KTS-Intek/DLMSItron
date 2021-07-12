@@ -79,7 +79,7 @@ QByteArray DlmsItronProcessor::getTheSecondMessage(const QVariantHash &hashConst
                                                                                   defPassword4meterVersion(lastExchangeState.lastMeterIsShortDlms));
 //                LandisGyrDLMSHelper::getAarqSmpl(lastExchangeState.lastMeterIsShortDlms);
 
-   return crcCalcExt(getItronAddressArrayHex(), HDLC_FRAME_I, lastExchangeState.messageCounterRRR, lastExchangeState.messageCounterSSS, arrMessageXtend);
+   return crcCalcFrameIarrItron(arrMessageXtend);//  crcCalcExt(getItronAddressArrayHex(), HDLC_FRAME_I, lastExchangeState.messageCounterRRR, lastExchangeState.messageCounterSSS, arrMessageXtend);
 
 //    return crcCalcFrameIarr(hashConstData, arrMessageXtend);
 }
@@ -113,7 +113,19 @@ bool DlmsItronProcessor::messageIsValidItron(const QByteArray &readArr, QVariant
     lastExchangeState.lastHiLoHex = getItronAddressArrayHiLo();
 return messageIsValid(readArr, listMeterMesageVar, commandCodeH,
                        lastExchangeState.lastHiLoHex, frameType, errCode,
-                       lastExchangeState.sourceAddressH);
+                      lastExchangeState.sourceAddressH);
+}
+
+QByteArray DlmsItronProcessor::crcCalcFrameIItron(const ObisList &obisList, const AttributeList &attributeList)
+{
+// return crcCalcFrameIarr()
+    return crcCalcFrameIarrItron(DlmsHelper::arrMessageXtend(lastExchangeState.lastObisList, obisList, attributeList, lastExchangeState.lastMeterIsShortDlms));
+}
+
+QByteArray DlmsItronProcessor::crcCalcFrameIarrItron(const QByteArray &arrMessageXtend)
+{
+    return crcCalcExt(getItronAddressArrayHex(), HDLC_FRAME_I, lastExchangeState.messageCounterRRR, lastExchangeState.messageCounterSSS, arrMessageXtend);
+
 }
 
 void DlmsItronProcessor::message2meter(const quint8 &pollCode, const QVariantHash &hashConstData, QVariantHash &hashTmpData, QVariantHash &hashMessage, quint16 &step)
@@ -419,6 +431,39 @@ bool DlmsItronProcessor::decodeMeterDtSnVrsn(const QVariantList &meterMessageVar
 
 QByteArray DlmsItronProcessor::preparyTotalEnrg(const QVariantHash &hashConstData, QVariantHash &hashTmpData)
 {
+    ObisList listCommand;
+    AttributeList listAttribute;
+
+    int trff = hashConstData.value("trff", DEF_TARIFF_NUMB).toInt();
+    if(trff < 1 || trff > MAX_TARIFF_COUNT)
+        trff = DEF_TARIFF_NUMB;
+
+
+    int sizeLeft = 125 - 19;// 19 byte header + FCS
+    const int oneAnswrSize = (10 + 7) * (trff + 1); //10 value + 7 scaller unit + T0
+    int enrgCntr = 0;
+    int enrgCntrIgnore = 0;
+
+
+
+    const bool getVersion = DlmsItronHelper::getVersionCache(hashConstData, hashTmpData);
+    const QString version = hashTmpData.value("vrsn").toString();
+
+    int obisSize = 0;
+
+    qint16 currEnrg = hashTmpData.value("currEnrg", 0).toInt();
+
+
+    if(!hashTmpData.value("DLMS_dt_sn_vrsn_ready", false).toBool())
+        DlmsItronHelper::addObis4readDtSnVrsnDst(listCommand, listAttribute, false, getVersion, lastExchangeState.lastMeterIsShortDlms); //0x20
+
+
+    if(!listCommand.isEmpty()){
+
+        hashTmpData.insert("DLMS_currEnrg", currEnrg);//поточна енергія (останній індекс)
+        hashTmpData.insert("DLMS_enrgCntr", enrgCntr);//скільки енергій запитую
+        return crcCalcFrameIItron(listCommand, listAttribute);
+    }
 
     return QByteArray();
 
@@ -427,7 +472,34 @@ QByteArray DlmsItronProcessor::preparyTotalEnrg(const QVariantHash &hashConstDat
 QVariantHash DlmsItronProcessor::fullCurrent(const QVariantList &meterMessageVar, const quint8 &errCode, quint16 &step, const QVariantHash &hashConstData, const QVariantHash &hashTmpData, const QList<QByteArray> &lastDump, int &warning_counter, int &error_counter)
 {
 
-    return QVariantHash();
+
+    Q_UNUSED(errCode);
+    Q_UNUSED(lastDump);
+    QVariantHash hash;
+    hash.insert("messFail", true);
+
+    const int meterCount = meterMessageVar.size();
+    const int obisCount = lastExchangeState.lastObisList.size();
+    if(obisCount != meterCount)
+        return hash;
+
+    int goodObis = 0;
+
+    QString version = hashTmpData.value("vrsn").toString();
+    if(!hashTmpData.value("DLMS_dt_sn_vrsn_ready", false).toBool()){
+        if(!decodeMeterDtSnVrsn(meterMessageVar, hashConstData, hashTmpData, hash, step, warning_counter, error_counter, goodObis))
+            return hash;
+
+        version = hash.value("vrsn").toString();
+
+        hash.insert("DLMS_dt_sn_vrsn_ready", true);
+
+
+    }
+
+    return hash;
+
+
 }
 
 QVariantHash DlmsItronProcessor::fullCurrentShortNames(const QVariantList &meterMessageVar, const QVariantHash &hashTmpData)

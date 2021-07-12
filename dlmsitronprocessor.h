@@ -33,6 +33,11 @@ public:
     bool messageIsValidItron(const QByteArray &readArr, QVariantList &listMeterMesageVar, QList<QByteArray> &commandCodeH, quint8 &frameType, quint8 &errCode);
 
 
+    QByteArray crcCalcFrameIItron(const ObisList &obisList, const AttributeList &attributeList) ;
+
+    QByteArray crcCalcFrameIarrItron(const QByteArray &arrMessageXtend) ;
+
+
 
     void message2meter(const quint8 &pollCode, const QVariantHash &hashConstData, QVariantHash &hashTmpData, QVariantHash &hashMessage, quint16 &step);
 

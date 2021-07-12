@@ -187,5 +187,37 @@ QByteArray DlmsItronHelper::getAarq(const QVariantHash &hashConstData, const boo
 
 }
 
+void DlmsItronHelper::addObis4readDtSnVrsnDst(ObisList &obislist, AttributeList &attrList, const bool &addDst, const bool &getVersion, const bool &lastIsShortDlms)
+{
+    if(lastIsShortDlms){
+//        addObis4readDtSnVrsnDstSn(obislist, attrList, addDst, getVersion);
+        return;
+    }
+    obislist.prepend(CMD_GSET_METER_NUMBER);
+    attrList.prepend(2);  //"00 01 00 00 2A 00 00 FF 02 00" //sn
+
+    if(getVersion && false){//for test only
+        obislist.prepend(CMD_GET_FIRMWARE_VERSION);
+        attrList.prepend(2);  //"00 01 00 00 60 01 01 FF 02 00" //meter type  G1B or G3B
+
+        obislist.prepend(CMD_GET_MODIFICATION);
+        attrList.prepend(2);  //"00 01 00 00 60 01 02 FF" //220.F18.P2.C300.V1.R1L5  meter version
+    }
+    obislist.prepend(CMD_GSET_DATETIME);
+    attrList.prepend(2);  //"00 08 00 00 01 00 00 FF 02 00"
+
+    if(addDst){
+        obislist.prepend(CMD_GSET_DATETIME);
+        attrList.prepend(5);//dst begin
+        obislist.prepend(CMD_GSET_DATETIME);
+        attrList.prepend(6);//dst end
+        obislist.prepend(CMD_GSET_DATETIME);
+        attrList.prepend(7);//dst deviation
+        obislist.prepend(CMD_GSET_DATETIME);
+        attrList.prepend(8);//dst enabled
+
+    }
+}
+
 
 //---------------------------------------------------------------------------------------------------------

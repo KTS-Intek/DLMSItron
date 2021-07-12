@@ -28,6 +28,7 @@ public:
 
 //    static QByteArray getValidPassword(const QVariantHash &hashConstData, const bool &retInHex, const QByteArray &defPasswd);
 
+    static void addObis4readDtSnVrsnDst(ObisList &obislist, AttributeList &attrList, const bool &addDst, const bool &getVersion, const bool &lastIsShortDlms);
 
 };
 
