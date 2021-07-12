@@ -86,8 +86,6 @@ QByteArray DlmsItronProcessor::getTheSecondMessage(const QVariantHash &hashConst
 
 QByteArray DlmsItronProcessor::defPassword4meterVersion(const QString &version)
 {
-
-
     return defPassword4meterVersion(isAShortNameMeter(version));
 }
 
