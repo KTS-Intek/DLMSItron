@@ -92,7 +92,7 @@ public:
                            const QVariantHash &hashConstData, const QVariantHash &hashTmpData, const QList<QByteArray> &lastDump, int &warning_counter, int &error_counter);
 
 
-    void preparyWriteDT(const QVariantHash &hashConstData, QVariantHash &hashMessage);
+    void preparyWriteDT(QVariantHash &hashMessage);
 
 
 

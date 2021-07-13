@@ -124,7 +124,7 @@ Mess2meterRezult DlmsItron::mess2meter(const Mess2meterArgs &pairAboutMeter)
 
     if(!go2exit && hashTmpData.value("corrDateTime", false).toBool()){
 
-        dataprocessor.preparyWriteDT(hashConstData, hashMessage);
+        dataprocessor.preparyWriteDT(hashMessage);
         go2exit = true;
     }
 
@@ -655,26 +655,35 @@ Mess2meterRezult DlmsItron::messParamPamPam(const Mess2meterArgs &pairAboutMeter
 
     case POLL_CODE_READ_DATE_TIME_DST:{
 
-//        DlmsItronHelper::addObis4readDtSnVrsnDst(listCommand, listAttribute, true, getVersion ? "" : version, dataprocessor.lastExchangeState.lastMeterIsShortDlms); //0x20
+        quint8 itronStep = hashTmpData.value("ACE_itronStep", 0).toUInt();
+        DlmsItronHelper::addObis4readDtSnVrsnDst(itronStep, listCommand, listAttribute, true, dataprocessor.lastExchangeState.lastMeterIsShortDlms); //0x20
+        hashTmpData.insert("ACE_itronStep", itronStep);
+
 
         break;}
 
     case POLL_CODE_WRITE_DATE_TIME:{
 
+        quint8 itronStep = hashTmpData.value("ACE_itronStep", 0).toUInt();
+
         if(!hashTmpData.value("DLMS_dt_sn_vrsn_ready", false).toBool()){
             //first
-//            DlmsItronHelper::addObis4readDtSnVrsnDst(listCommand, listAttribute, true, getVersion ? "" : version, dataprocessor.lastExchangeState.lastMeterIsShortDlms); //0x20
+            DlmsItronHelper::addObis4readDtSnVrsnDst(itronStep, listCommand, listAttribute, true, dataprocessor.lastExchangeState.lastMeterIsShortDlms); //0x20
+            hashTmpData.insert("ACE_itronStep", itronStep);
+
         }else{
 
 
             if(hashTmpData.value("DLMS_DateReady", false).toBool()){
                 //third
-//                DlmsItronHelper::addObis4readDtSnVrsnDst(listCommand, listAttribute, true, getVersion ? "" : version, dataprocessor.lastExchangeState.lastMeterIsShortDlms); //0x20
+                DlmsItronHelper::addObis4readDtSnVrsnDst(itronStep, listCommand, listAttribute, true, dataprocessor.lastExchangeState.lastMeterIsShortDlms); //0x20
+                hashTmpData.insert("ACE_itronStep", itronStep);
 
             }else{
                 //second
+
                 useHdlcFrameI = false;
-                dataprocessor.preparyWriteDT(hashConstData, hashMessage);
+                dataprocessor.preparyWriteDT( hashMessage);
 
             }
         }
@@ -750,7 +759,7 @@ Mess2meterRezult DlmsItron::messParamPamPam(const Mess2meterArgs &pairAboutMeter
     }
 
     if(useHdlcFrameI && !listCommand.isEmpty()){
-        hashMessage.insert("message_0", dataprocessor.crcCalcFrameI(hashConstData, listCommand, listAttribute));
+        hashMessage.insert("message_0", dataprocessor.crcCalcFrameIItron(listCommand, listAttribute));
 
     }
 
@@ -868,7 +877,12 @@ QVariantHash DlmsItron::decodeParamPamPam(const DecodeMeterMess &threeHash)
             for(int i = 0, iMax = lk.size(); i < iMax; i++)
                 hashTmpData.insert(lk.at(i), hash.value(lk.at(i)));
             hashTmpData.insert("messFail", false);
-            step = 0xFFFF;
+
+            const quint8 itronStep = hashTmpData.value("ACE_itronStep", 0).toUInt() + 1;
+            hashTmpData.insert("ACE_itronStep", itronStep);
+
+            if(itronStep > 5)
+                step = 0xFFFF;
         }
 
         break;}
@@ -884,7 +898,15 @@ QVariantHash DlmsItron::decodeParamPamPam(const DecodeMeterMess &threeHash)
                 for(int i = 0, iMax = lk.size(); i < iMax; i++)
                     hashTmpData.insert(lk.at(i), hash.value(lk.at(i)));
                 hashTmpData.insert("messFail", false);
-                hashTmpData.insert("DLMS_dt_sn_vrsn_ready", true);
+
+                const quint8 itronStep = hashTmpData.value("ACE_itronStep", 0).toUInt() + 1;
+                hashTmpData.insert("ACE_itronStep", itronStep);
+
+                if(itronStep > 5){
+                    hashTmpData.insert("DLMS_dt_sn_vrsn_ready", true);
+                    hashTmpData.insert("ACE_itronStep", 1);//do not read SN again
+
+                }
 
                 //                the next step is to write dt
             }
@@ -904,7 +926,11 @@ QVariantHash DlmsItron::decodeParamPamPam(const DecodeMeterMess &threeHash)
                     for(int i = 0, iMax = lk.size(); i < iMax; i++)
                         hashTmpData.insert(lk.at(i), hash.value(lk.at(i)));
                     hashTmpData.insert("messFail", false);
-                    step = 0xFFFF;
+
+                    const quint8 itronStep = hashTmpData.value("ACE_itronStep", 0).toUInt() + 1;
+                    hashTmpData.insert("ACE_itronStep", itronStep);
+                    if(itronStep > 1)//it is already with DST
+                        step = 0xFFFF;
                 }
             }else{
 

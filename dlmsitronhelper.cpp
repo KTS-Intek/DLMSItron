@@ -187,36 +187,75 @@ QByteArray DlmsItronHelper::getAarq(const QVariantHash &hashConstData, const boo
 
 }
 
-void DlmsItronHelper::addObis4readDtSnVrsnDst(ObisList &obislist, AttributeList &attrList, const bool &addDst, const bool &getVersion, const bool &lastIsShortDlms)
+void DlmsItronHelper::addObis4readDtSnVrsnDst(quint8 &itronStep, ObisList &obislist, AttributeList &attrList, const bool &addDst, const bool &lastIsShortDlms)
 {
+
+
     if(lastIsShortDlms){
 //        addObis4readDtSnVrsnDstSn(obislist, attrList, addDst, getVersion);
         return;
     }
-    obislist.prepend(CMD_GSET_METER_NUMBER);
-    attrList.prepend(2);  //"00 01 00 00 2A 00 00 FF 02 00" //sn
 
-    if(getVersion && false){//for test only
-        obislist.prepend(CMD_GET_FIRMWARE_VERSION);
-        attrList.prepend(2);  //"00 01 00 00 60 01 01 FF 02 00" //meter type  G1B or G3B
 
-        obislist.prepend(CMD_GET_MODIFICATION);
-        attrList.prepend(2);  //"00 01 00 00 60 01 02 FF" //220.F18.P2.C300.V1.R1L5  meter version
+//    if(!getVersion && (itronStep == 1)){
+//        itronStep = 2;
+//    }
+
+    if(!addDst && itronStep > 1){
+        itronStep = 0xFF;//get out
+        return;
     }
-    obislist.prepend(CMD_GSET_DATETIME);
-    attrList.prepend(2);  //"00 08 00 00 01 00 00 FF 02 00"
 
-    if(addDst){
+    switch(itronStep){
+    case 0:{
+        obislist.prepend(CMD_GSET_METER_NUMBER);
+        attrList.prepend(2);  //"00 01 00 00 2A 00 00 FF 02 00" //sn
+        break;}
+
+//    case 1:{
+//        obislist.prepend(CMD_GET_FIRMWARE_VERSION);
+//        attrList.prepend(2);  //"00 01 00 00 60 01 01 FF 02 00" //meter type  G1B or G3B
+//        break;}
+
+//    case 1:{
+//        obislist.prepend(CMD_GET_MODIFICATION);
+//        attrList.prepend(2);  //"00 01 00 00 60 01 02 FF" //220.F18.P2.C300.V1.R1L5  meter version
+//        break;}
+
+    case 1:{
+        obislist.prepend(CMD_GSET_DATETIME);
+        attrList.prepend(2);  //"00 08 00 00 01 00 00 FF 02 00"
+        break;}
+
+    case 2:{
         obislist.prepend(CMD_GSET_DATETIME);
         attrList.prepend(5);//dst begin
+        break;}
+
+    case 3:{
         obislist.prepend(CMD_GSET_DATETIME);
         attrList.prepend(6);//dst end
+        break;}
+
+    case 4:{
         obislist.prepend(CMD_GSET_DATETIME);
         attrList.prepend(7);//dst deviation
+        break;}
+
+    case 5:{
         obislist.prepend(CMD_GSET_DATETIME);
         attrList.prepend(8);//dst enabled
 
+        break;}
     }
+
+}
+
+QByteArray DlmsItronHelper::addObis4writeDt(ObisList &lastObisList, const bool &lastMeterIsShortDlms)
+{
+    return addObis4writeDtExt(lastObisList, CMD_GSET_DATETIME, 0, lastMeterIsShortDlms, "FF FF 4C 80" );
+    //I don't know why it must be FF FF 4C 80, but if I use FF FF FF FF the time is incorrect, the difference is 3600 seconds
+
 }
 
 

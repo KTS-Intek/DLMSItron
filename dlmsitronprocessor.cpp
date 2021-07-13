@@ -218,20 +218,12 @@ bool DlmsItronProcessor::decodeMeterDtSnVrsn(const QVariantList &meterMessageVar
 
     goodObis = 0;
 
-    int maxVal4good = 2;
-    for(int i = 0, dtObis = 0; i < meterCount; i++){
-        if(lastExchangeState.lastObisList.at(i) == CMD_GSET_DATETIME){
-            dtObis++;
-            if(dtObis > 1){//read dt sett
-                maxVal4good = 6;
-                break;
-            }
-        }
-    }
-    int dtReadyClass = maxVal4good;
 
-    if(lastExchangeState.lastObisList.contains(CMD_GET_MODIFICATION))
-        maxVal4good += 2;
+    const int itronStep = hashTmpData.value("ACE_itronStep", 0).toInt() ;
+
+    int maxVal4good = 1;
+
+    int dtReadyClass = itronStep + 1;
 
 
     /* maxVal4good = 3;
@@ -253,7 +245,6 @@ bool DlmsItronProcessor::decodeMeterDtSnVrsn(const QVariantList &meterMessageVar
      */
 
 
-    QString vrsn, modification;
     for(int i = 0; i < meterCount && i < obisCount && i < maxVal4good; i++){
 
         switch(lastExchangeState.lastObisList.at(i)){
@@ -375,54 +366,33 @@ bool DlmsItronProcessor::decodeMeterDtSnVrsn(const QVariantList &meterMessageVar
         case CMD_GSET_METER_NUMBER:{
             QByteArray a = meterMessageVar.at(i).toByteArray();//EGM 000209244
             bool ok, ok2;
-            a.mid(3,6).toULongLong(&ok);
-            a.mid(6).toULongLong(&ok2);
-            if((a.length() == 13 && ok && ok2) || (lastExchangeState.lastMeterIsShortDlms && !a.isEmpty())){
+            a.mid(8,6).toULongLong(&ok);
+            a.mid(8).toULongLong(&ok2);
+//            ttyUSB0     > 12:04:42.078 7E A0 25 03 00 02 00 23 52 86 20 E6 E7 00 C4 01 ~.%....#R.
+//                                       81 00 09 10 41 43 45 36 36 31 4D 41 38 34 35 37 ....ACE661MA8457
+//                                       33 35 34 38 E7 6A 7E                            3548.j~
+            if((a.length() >= 13 && ok && ok2) || (lastExchangeState.lastMeterIsShortDlms && !a.isEmpty())){
                 goodObis++;
 
+                QString vrsn;
+
                 if(!lastExchangeState.lastMeterIsShortDlms){
-                    a = a.mid(3);
+                    vrsn = a.left(8);
+
+                    a = a.mid(8);
                     if(a.left(1) == "0")
                         a = a.mid(1);
                     if(a.left(1) == "0")
                         a = a.mid(1);
                 }
                 hash.insert("SN", a);
+                hash.insert("vrsn", vrsn);
+
             }
             break;}
 
-        case CMD_GET_FIRMWARE_VERSION:{
-            const QString a = meterMessageVar.at(i).toString();
-            const QString asimple = a.simplified().trimmed();
-            if(asimple == a || (lastExchangeState.lastMeterIsShortDlms && !asimple.isEmpty())){//G1B F38 - A+, A-; G1B F18 - |A|
-                goodObis++;
-                vrsn = asimple;
-            }
-            break;}
-        case CMD_GET_MODIFICATION:{
-            QString a = meterMessageVar.at(i).toString();
-            const QString asimple = a.simplified().trimmed();
-            if(asimple == a){//220.F38.P2.C300.V1.R1L5 - A+, A-; 220.F18.P2.C300.V1.R1L5 - |A|
-                const QStringList l = asimple.split(".");
-                a.clear();
-                for(int j = 0, jMax = l.size(); j < jMax; j++){
-                    if(a.isEmpty()){
-                        if(l.at(j).startsWith("F"))
-                            a = l.at(j);
-                    }else{
-                        if(l.at(j).startsWith("R1")){
-                            a.append("." + l.at(j));
-                            break;
-                        }
-                    }
-                }
-                modification = a;
-                goodObis++;} //save as   Fxx or Fxx.R1
-            break;}
         }
     }
-    if(!vrsn.isEmpty() && !modification.isEmpty())
-        hash.insert("vrsn", QString("%1 %2%3").arg(vrsn).arg(modification).arg( lastExchangeState.lastMeterIsShortDlms ? " SN" : ""));
 
     return  (meterCount > maxVal4good) ? (goodObis == maxVal4good) : (goodObis == meterCount);
 }
@@ -446,7 +416,7 @@ QByteArray DlmsItronProcessor::preparyTotalEnrg(const QVariantHash &hashConstDat
 
 
 
-    const bool getVersion = DlmsItronHelper::getVersionCache(hashConstData, hashTmpData);
+//    const bool getVersion = DlmsItronHelper::getVersionCache(hashConstData, hashTmpData);
     const QString version = hashTmpData.value("vrsn").toString();
 
     int obisSize = 0;
@@ -454,8 +424,18 @@ QByteArray DlmsItronProcessor::preparyTotalEnrg(const QVariantHash &hashConstDat
     qint16 currEnrg = hashTmpData.value("currEnrg", 0).toInt();
 
 
-    if(!hashTmpData.value("DLMS_dt_sn_vrsn_ready", false).toBool())
-        DlmsItronHelper::addObis4readDtSnVrsnDst(listCommand, listAttribute, false, getVersion, lastExchangeState.lastMeterIsShortDlms); //0x20
+    if(!hashTmpData.value("DLMS_dt_sn_vrsn_ready", false).toBool()){
+        quint8 itronStep = hashTmpData.value("ACE_itronStep", 0).toUInt();
+
+        DlmsItronHelper::addObis4readDtSnVrsnDst(itronStep, listCommand, listAttribute, false, lastExchangeState.lastMeterIsShortDlms); //0x20
+        hashTmpData.insert("ACE_itronStep", itronStep);
+
+        if(!listCommand.isEmpty())
+            return crcCalcFrameIItron(listCommand, listAttribute);
+
+         hashTmpData.insert("DLMS_dt_sn_vrsn_ready", true);
+
+    }
 
 
     if(!listCommand.isEmpty()){
@@ -490,9 +470,15 @@ QVariantHash DlmsItronProcessor::fullCurrent(const QVariantList &meterMessageVar
         if(!decodeMeterDtSnVrsn(meterMessageVar, hashConstData, hashTmpData, hash, step, warning_counter, error_counter, goodObis))
             return hash;
 
-        version = hash.value("vrsn").toString();
+        const quint8 itronStep = hashTmpData.value("ACE_itronStep", 0).toUInt() + 1;
+        hash.insert("ACE_itronStep", itronStep);
+        hash.insert("messFail", false);
 
-        hash.insert("DLMS_dt_sn_vrsn_ready", true);
+        return hash;
+
+//        version = hash.value("vrsn").toString();
+
+//        hash.insert("DLMS_dt_sn_vrsn_ready", true);
 
 
     }
@@ -577,8 +563,12 @@ QVariantHash DlmsItronProcessor::fullVoltage(const QVariantList &meterMessageVar
 
 }
 
-void DlmsItronProcessor::preparyWriteDT(const QVariantHash &hashConstData, QVariantHash &hashMessage)
+void DlmsItronProcessor::preparyWriteDT(QVariantHash &hashMessage)
 {
-
+//    192.168.88.41  > 20:18:17.506 7E A0 28 02 23 03 DC 5C AE E6 E6 00 C1 01 C1 00 ~.(.#..\
+//                                   08 00 00 01 00 00 FF 02 00 09 0C 07 E5 07 07 FF
+//                                   14 12 11 FF FF 4C 80 01 67 7E
+    hashMessage.insert("message_0",
+                       crcCalcFrameIarrItron("E6 E6 00" + DlmsItronHelper::addObis4writeDt(lastExchangeState.lastObisList, lastExchangeState.lastMeterIsShortDlms)));
 }
 
