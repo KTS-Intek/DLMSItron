@@ -14,11 +14,15 @@
 
 
 
+//----------------------------------------------------------------------------------
+
 DlmsItronProcessor::DlmsItronProcessor(QObject *parent) : DlmsProcessor(parent)
 {
     lastExchangeState.sourceAddressH = "03";//21 works, but for writting 41 must be used //this fucking meter doesn't want to authorize with another address
 
 }
+
+//----------------------------------------------------------------------------------
 
 bool DlmsItronProcessor::isAShortNameMeter(const QString &version)
 {
@@ -26,16 +30,22 @@ bool DlmsItronProcessor::isAShortNameMeter(const QString &version)
 
 }
 
+//----------------------------------------------------------------------------------
+
 QByteArray DlmsItronProcessor::getItronAddressArrayHex()
 {
     return QByteArray("02 23");
 }
+
+//----------------------------------------------------------------------------------
 
 QByteArray DlmsItronProcessor::getItronAddressArrayHiLo()
 {
     return QByteArray("00020023");
 
 }
+
+//----------------------------------------------------------------------------------
 
 
 QByteArray DlmsItronProcessor::getTheFirstMessage(const QVariantHash &hashConstData)
@@ -71,6 +81,8 @@ QByteArray DlmsItronProcessor::getTheFirstMessage(const QVariantHash &hashConstD
 
 }
 
+//----------------------------------------------------------------------------------
+
 QByteArray DlmsItronProcessor::getTheSecondMessage(const QVariantHash &hashConstData, QVariantHash &hashTmpData)
 {
     Q_UNUSED(hashTmpData);
@@ -84,16 +96,22 @@ QByteArray DlmsItronProcessor::getTheSecondMessage(const QVariantHash &hashConst
 //    return crcCalcFrameIarr(hashConstData, arrMessageXtend);
 }
 
+//----------------------------------------------------------------------------------
+
 QByteArray DlmsItronProcessor::defPassword4meterVersion(const QString &version)
 {
     return defPassword4meterVersion(isAShortNameMeter(version));
 }
+
+//----------------------------------------------------------------------------------
 
 QByteArray DlmsItronProcessor::defPassword4meterVersion(const bool &shortDlms)
 {
     Q_UNUSED(shortDlms);
     return QByteArray("ABCDEFGH");
 }
+
+//----------------------------------------------------------------------------------
 
 void DlmsItronProcessor::preparyLogined(const QVariantHash &hashConstData, QVariantHash &hashTmpData, QVariantHash &hashMessage)
 {
@@ -108,6 +126,8 @@ void DlmsItronProcessor::preparyLogined(const QVariantHash &hashConstData, QVari
                              ); //хто ти ???
 }
 
+//----------------------------------------------------------------------------------
+
 bool DlmsItronProcessor::messageIsValidItron(const QByteArray &readArr, QVariantList &listMeterMesageVar, QList<QByteArray> &commandCodeH, quint8 &frameType, quint8 &errCode)
 {
     lastExchangeState.lastHiLoHex = getItronAddressArrayHiLo();
@@ -116,17 +136,34 @@ return messageIsValid(readArr, listMeterMesageVar, commandCodeH,
                       lastExchangeState.sourceAddressH);
 }
 
+//----------------------------------------------------------------------------------
+
 QByteArray DlmsItronProcessor::crcCalcFrameIItron(const ObisList &obisList, const AttributeList &attributeList)
 {
 // return crcCalcFrameIarr()
     return crcCalcFrameIarrItron(DlmsHelper::arrMessageXtend(lastExchangeState.lastObisList, obisList, attributeList, lastExchangeState.lastMeterIsShortDlms));
 }
 
+QByteArray DlmsItronProcessor::crcCalcFrameIItronTotalEnrg(const ObisList &obisList, const AttributeList &attributeList)
+{
+    QList<QByteArray> cidl;
+    cidl.append("0003");
+
+//    if(lastExchangeState.lastMeterIsShortDlms)
+
+    return crcCalcFrameIarrItron(DlmsHelper::arrMessageXtendExt(lastExchangeState.lastObisList, obisList, cidl, attributeList));
+
+}
+
+//----------------------------------------------------------------------------------
+
 QByteArray DlmsItronProcessor::crcCalcFrameIarrItron(const QByteArray &arrMessageXtend)
 {
     return crcCalcExt(getItronAddressArrayHex(), HDLC_FRAME_I, lastExchangeState.messageCounterRRR, lastExchangeState.messageCounterSSS, arrMessageXtend);
 
 }
+
+//----------------------------------------------------------------------------------
 
 void DlmsItronProcessor::message2meter(const quint8 &pollCode, const QVariantHash &hashConstData, QVariantHash &hashTmpData, QVariantHash &hashMessage, quint16 &step)
 {
@@ -162,6 +199,8 @@ void DlmsItronProcessor::message2meter(const quint8 &pollCode, const QVariantHas
 
     }
 }
+
+//----------------------------------------------------------------------------------
 
 void DlmsItronProcessor::decodeMeterData(const quint8 &pollCode, const QVariantList &meterMessageVar, const quint8 &errCode, quint16 &step, const QVariantHash &hashConstData, QVariantHash &hashTmpData, const QList<QByteArray> &commandCodeH, int &warning_counter, int &error_counter)
 {
@@ -208,6 +247,8 @@ void DlmsItronProcessor::decodeMeterData(const quint8 &pollCode, const QVariantL
 
     }
 }
+
+//----------------------------------------------------------------------------------
 
 bool DlmsItronProcessor::decodeMeterDtSnVrsn(const QVariantList &meterMessageVar, const QVariantHash &hashConstData, const QVariantHash &hashTmpData, QVariantHash &hash, quint16 &step, int &warning_counter, int &error_counter, int &goodObis)
 {
@@ -398,31 +439,13 @@ bool DlmsItronProcessor::decodeMeterDtSnVrsn(const QVariantList &meterMessageVar
 }
 
 
+//----------------------------------------------------------------------------------
+
 
 QByteArray DlmsItronProcessor::preparyTotalEnrg(const QVariantHash &hashConstData, QVariantHash &hashTmpData)
 {
     ObisList listCommand;
     AttributeList listAttribute;
-
-    int trff = hashConstData.value("trff", DEF_TARIFF_NUMB).toInt();
-    if(trff < 1 || trff > MAX_TARIFF_COUNT)
-        trff = DEF_TARIFF_NUMB;
-
-
-    int sizeLeft = 125 - 19;// 19 byte header + FCS
-    const int oneAnswrSize = (10 + 7) * (trff + 1); //10 value + 7 scaller unit + T0
-    int enrgCntr = 0;
-    int enrgCntrIgnore = 0;
-
-
-
-//    const bool getVersion = DlmsItronHelper::getVersionCache(hashConstData, hashTmpData);
-    const QString version = hashTmpData.value("vrsn").toString();
-
-    int obisSize = 0;
-
-    qint16 currEnrg = hashTmpData.value("currEnrg", 0).toInt();
-
 
     if(!hashTmpData.value("DLMS_dt_sn_vrsn_ready", false).toBool()){
         quint8 itronStep = hashTmpData.value("ACE_itronStep", 0).toUInt();
@@ -437,17 +460,35 @@ QByteArray DlmsItronProcessor::preparyTotalEnrg(const QVariantHash &hashConstDat
 
     }
 
+    if(!hashTmpData.contains("ACE_obisCodesHash"))
+        hashTmpData.insert("ACE_obisCodesHash",  DlmsItronHelper::getObisCodesTotal4thisMeter(hashConstData, hashTmpData.value("vrsn").toString()));
 
-    if(!listCommand.isEmpty()){
+    const QVariantHash obisCodesHash = hashTmpData.value("ACE_obisCodesHash").toHash();
+    const QVariantHash obisCodesScallersHash = hashTmpData.value("ACE_obisCodesScallersHash").toHash();
 
-        hashTmpData.insert("DLMS_currEnrg", currEnrg);//поточна енергія (останній індекс)
-        hashTmpData.insert("DLMS_enrgCntr", enrgCntr);//скільки енергій запитую
-        return crcCalcFrameIItron(listCommand, listAttribute);
+    if(!obisCodesHash.isEmpty()){
+        auto lk = obisCodesHash.keys();
+        std::sort(lk.begin(), lk.end());
+        const QString enrgKeyFull = lk.first();
+
+
+        DlmsItronHelper::addTariffAttribute2obisAndAttributeList(listCommand, listAttribute,
+                                                                 obisCodesHash.value(enrgKeyFull).toULongLong(),
+                                                                 (!obisCodesScallersHash.contains(enrgKeyFull)), lastExchangeState.lastMeterIsShortDlms);
+
+         //1. receive scaller unit
+         //2. receive value
+
+
+        hashTmpData.insert("DLMS_enrgKeyFull", enrgKeyFull);
+        return crcCalcFrameIItronTotalEnrg(listCommand, listAttribute);
     }
 
     return QByteArray();
 
 }
+
+//----------------------------------------------------------------------------------
 
 QVariantHash DlmsItronProcessor::fullCurrent(const QVariantList &meterMessageVar, const quint8 &errCode, quint16 &step, const QVariantHash &hashConstData, const QVariantHash &hashTmpData, const QList<QByteArray> &lastDump, int &warning_counter, int &error_counter)
 {
@@ -465,7 +506,7 @@ QVariantHash DlmsItronProcessor::fullCurrent(const QVariantList &meterMessageVar
 
     int goodObis = 0;
 
-    QString version = hashTmpData.value("vrsn").toString();
+//    QString version = hashTmpData.value("vrsn").toString();
     if(!hashTmpData.value("DLMS_dt_sn_vrsn_ready", false).toBool()){
         if(!decodeMeterDtSnVrsn(meterMessageVar, hashConstData, hashTmpData, hash, step, warning_counter, error_counter, goodObis))
             return hash;
@@ -475,18 +516,114 @@ QVariantHash DlmsItronProcessor::fullCurrent(const QVariantList &meterMessageVar
         hash.insert("messFail", false);
 
         return hash;
+    }
 
-//        version = hash.value("vrsn").toString();
 
-//        hash.insert("DLMS_dt_sn_vrsn_ready", true);
+    if(meterMessageVar.isEmpty())
+        return hash;
 
+     QVariantHash obisCodesHash = hashTmpData.value("ACE_obisCodesHash").toHash();
+     QVariantHash obisCodesScallersHash = hashTmpData.value("ACE_obisCodesScallersHash").toHash();
+     bool q2q4ready = false;
+
+    if(!obisCodesHash.isEmpty()){
+
+        const QString enrgKeyFull = hashTmpData.value("DLMS_enrgKeyFull").toString();
+
+        //1. receive scaller unit
+        //2. receive value
+
+        bool isValueValid = false;
+
+        if(obisCodesScallersHash.contains(enrgKeyFull)){
+         //this is a value
+
+            qreal val = meterMessageVar.first().toReal(&isValueValid) ;
+            const qreal s = obisCodesScallersHash.value(enrgKeyFull, 0.1).toDouble();
+
+            if(isValueValid){
+                val *= s;
+                val *= 0.001 ;//Wh to kWh
+
+                QString valStr = PrettyValues::prettyNumber(val, 4, MAX_PLG_PREC);
+                if(verboseMode) qDebug() << "fullCurrent DLMS total value " << val << valStr << s << q2q4ready;
+
+//                if(hasQuadrants && !tstr.right(2).contains("A")){
+//                    if(q2q4ready){
+//                        tstr = "DLMS_" + tstr;
+//                        valStr = QString("[%1]:[%2]").arg(valStr).arg((hash.contains(tstr)) ? hash.value(tstr).toString() : hashTmpData.value(tstr).toString());
+//                    }
+//                    if(verboseMode) qDebug() << "DLMS hasQuadrants total value " << val << valStr << tstr << q2q4ready;
+
+//                }
+                hash.insert(enrgKeyFull, valStr);
+
+                obisCodesHash.remove(enrgKeyFull);
+
+                hash.insert("ACE_obisCodesHash", obisCodesHash);
+
+
+            }else{
+                if(verboseMode) qDebug() << "fullCurrent bad value " << meterMessageVar.first() << val << s << enrgKeyFull;
+            }
+
+
+        }else{
+            //this  is a scaller unit
+
+            const int s = meterMessageVar.first().toMap().value("0", "NaN").toInt(&isValueValid);//scaler
+            if(isValueValid){
+                const qreal v = qPow(10.0, (qreal)s);
+                if(verboseMode) qDebug() << "fullCurrent obis2scaller " << QString::number(obisCodesHash.value(enrgKeyFull).toInt(), 16) << s << v << enrgKeyFull;
+                obisCodesScallersHash.insert(enrgKeyFull, v);
+                hash.insert("ACE_obisCodesScallersHash", obisCodesScallersHash);
+
+            }else{
+                const int obiserr = meterMessageVar.first().toInt(&isValueValid);
+
+                if(isValueValid && (obiserr == ERR_DLMS_BAD_REQUEST || obiserr == ERR_DLMS_BAD_REQUEST_2)){//the meter doesn't support this obis code because of its settings
+                    obisCodesScallersHash.insert(enrgKeyFull, 1.0);
+                    hash.insert("ACE_obisCodesScallersHash", obisCodesScallersHash);
+
+
+                    hash.insert(enrgKeyFull, "!");
+
+                    if(enrgKeyFull.startsWith("T1_") && hashTmpData.contains(QString("T0_%1").arg(enrgKeyFull.right(2))))//T0_  <Ax/Rx>
+                        hash.insert(enrgKeyFull, hashTmpData.value(QString("T0_%1").arg(enrgKeyFull.right(2))));
+
+
+                    obisCodesHash.remove(enrgKeyFull);
+                    hash.insert("ACE_obisCodesHash", obisCodesHash);
+
+                }else
+                    if(verboseMode) qDebug() << "fullCurrent bad scaller_unit " << meterMessageVar.first() << s << isValueValid << enrgKeyFull;
+            }
+        }
+
+        if(isValueValid){
+            hash.insert("messFail", false);
+
+        }
+        hash.insert("DLMS_enrgKeyFull", "");
+
+
+        if(obisCodesHash.isEmpty()){
+            //there is nothing to receive
+            step = 0xFFFF;
+
+        }
+//        return hash;
 
     }
+
+
 
     return hash;
 
 
 }
+
+//----------------------------------------------------------------------------------
 
 QVariantHash DlmsItronProcessor::fullCurrentShortNames(const QVariantList &meterMessageVar, const QVariantHash &hashTmpData)
 {
@@ -494,11 +631,15 @@ QVariantHash DlmsItronProcessor::fullCurrentShortNames(const QVariantList &meter
 
 }
 
+//----------------------------------------------------------------------------------
+
 QVariantHash DlmsItronProcessor::fullVoltageShortNames(const QVariantList &meterMessageVar, const QVariantHash &hashTmpData)
 {
     return QVariantHash();
 
 }
+
+//----------------------------------------------------------------------------------
 
 QVariantHash DlmsItronProcessor::fullLoadProfileShortNames(const QVariantList &meterMessageVar, const QVariantHash &hashTmpData)
 {
@@ -506,62 +647,86 @@ QVariantHash DlmsItronProcessor::fullLoadProfileShortNames(const QVariantList &m
 
 }
 
+//----------------------------------------------------------------------------------
+
 QVariantHash DlmsItronProcessor::fullShortNamesExt(const QVariantList &meterMessageVar, const QVariantHash &hashTmpData)
 {
     return QVariantHash();
 
 }
 
+//----------------------------------------------------------------------------------
+
 void DlmsItronProcessor::fillCurrentShortNamesEnergyKeys(DLMSShortNamesParams &params)
 {
 
 }
 
-void DlmsItronProcessor::fillVoltageShortNamesEnergyKeys(DLMSShortNamesParams &params)
+void
+//----------------------------------------------------------------------------------
+ DlmsItronProcessor::fillVoltageShortNamesEnergyKeys(DLMSShortNamesParams &params)
 {
 
 }
+
+//----------------------------------------------------------------------------------
 
 void DlmsItronProcessor::fillLoadProfileShortNamesEnergyKeys(DLMSShortNamesParams &params, const ObisList &DLMS_enrgObisList)
 {
 
 }
 
+//----------------------------------------------------------------------------------
+
 void DlmsItronProcessor::addTariff2obisList(ObisList &obislist, AttributeList &attrList, const int &lastTariff, const QString &enrgKey, const bool &lastIsShortDlms, bool &hasQuadrants)
 {
 
 }
+
+//----------------------------------------------------------------------------------
 
 void DlmsItronProcessor::addTariff2obisListSN(ObisList &obislist, AttributeList &attrList, const int &lastTariff, const QString &enrgKey, bool &hasQuadrants)
 {
 
 }
 
+//----------------------------------------------------------------------------------
+
 void DlmsItronProcessor::addVoltage2obisList(ObisList &obislist, AttributeList &attrList, const QString &enrgKeys, const bool &lastIsShortDlms, const QString &version)
 {
 
 }
+
+//----------------------------------------------------------------------------------
 
 void DlmsItronProcessor::addVoltage2obisListSN(ObisList &obislist, AttributeList &attrList, const QString &enrgKeys, const QString &version)
 {
 
 }
 
+//----------------------------------------------------------------------------------
+
 void DlmsItronProcessor::addEnrgKeyTariff2obisListSN(ObisList &obislist, AttributeList &attrList, const quint64 &obis, const DLMSShortNames &shortNameSett)
 {
 
 }
+
+//----------------------------------------------------------------------------------
 
 QByteArray DlmsItronProcessor::preparyVoltage(const QVariantHash &hashConstData, QVariantHash &hashTmpData)
 {
     return QByteArray();
 }
 
+//----------------------------------------------------------------------------------
+
 QVariantHash DlmsItronProcessor::fullVoltage(const QVariantList &meterMessageVar, const quint8 &errCode, quint16 &step, const QVariantHash &hashConstData, const QVariantHash &hashTmpData, const QList<QByteArray> &lastDump, int &warning_counter, int &error_counter)
 {
     return QVariantHash();
 
 }
+
+//----------------------------------------------------------------------------------
 
 void DlmsItronProcessor::preparyWriteDT(QVariantHash &hashMessage)
 {
@@ -572,3 +737,5 @@ void DlmsItronProcessor::preparyWriteDT(QVariantHash &hashMessage)
                        crcCalcFrameIarrItron("E6 E6 00" + DlmsItronHelper::addObis4writeDt(lastExchangeState.lastObisList, lastExchangeState.lastMeterIsShortDlms)));
 }
 
+
+//----------------------------------------------------------------------------------

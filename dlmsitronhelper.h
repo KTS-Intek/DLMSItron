@@ -32,6 +32,16 @@ public:
 
     static QByteArray addObis4writeDt(ObisList &lastObisList, const bool &lastMeterIsShortDlms);
 
+    static QVariantHash getObisCodesTotal4thisMeter(const QVariantHash &hashConstData, const QString &version);
+
+    static quint64 getObis4energyIndexTotal(const int &indx);
+
+    static void addTariffAttribute2obisAndAttributeList(ObisList &obislist, AttributeList &attrList, const quint64 &obis, const bool &ask4scallerUnit, const bool &lastIsShortDlms);
+
+//    static void addTariffAttribute2obisAndAttributeListSN(ObisList &obislist, AttributeList &attrList, const quint64 &obis, const bool &ask4scallerUnit);
+
+
+
 };
 
 #endif // DLMSITRONHELPER_H

@@ -10,11 +10,16 @@ QStringList DlmsItronHelper::getSupportedEnrg(const quint8 &code, const QString 
         return QStringList();
 
 
+    if(code == POLL_CODE_READ_VOLTAGE){
+        return QString("UA,UB,UC,IA,IB,IC,PA,PB,PC,QA,QB,QC,cos_fA,cos_fB,cos_fC,F").split(',');
+    }
+
+
     const QString defEnrg = version.isEmpty() ? "A+,A-,R+,R-" : "";
 
     QString v;
     if(!version.isEmpty()){
-        v = (version.contains("A")) ? "A+" : "A+,A-,R+,R-";
+        v = "A+,A-,R+,R-";
     }
 
 
@@ -187,6 +192,8 @@ QByteArray DlmsItronHelper::getAarq(const QVariantHash &hashConstData, const boo
 
 }
 
+//---------------------------------------------------------------------------------------------------------
+
 void DlmsItronHelper::addObis4readDtSnVrsnDst(quint8 &itronStep, ObisList &obislist, AttributeList &attrList, const bool &addDst, const bool &lastIsShortDlms)
 {
 
@@ -251,12 +258,84 @@ void DlmsItronHelper::addObis4readDtSnVrsnDst(quint8 &itronStep, ObisList &obisl
 
 }
 
+//---------------------------------------------------------------------------------------------------------
+
 QByteArray DlmsItronHelper::addObis4writeDt(ObisList &lastObisList, const bool &lastMeterIsShortDlms)
 {
     return addObis4writeDtExt(lastObisList, CMD_GSET_DATETIME, 0, lastMeterIsShortDlms, "FF FF 4C 80" );
     //I don't know why it must be FF FF 4C 80, but if I use FF FF FF FF the time is incorrect, the difference is 3600 seconds
 
 }
+
+//---------------------------------------------------------------------------------------------------------
+
+QVariantHash DlmsItronHelper::getObisCodesTotal4thisMeter(const QVariantHash &hashConstData, const QString &version)
+{
+    int trff = hashConstData.value("trff", DEF_TARIFF_NUMB).toInt();
+    if(trff < 1 || trff > TRFF_MAX_TARIFFNUMB)
+        trff = DEF_TARIFF_NUMB;
+    const QStringList listEnrg = hashConstData.value("listEnrg").toStringList();
+
+    const QStringList listPlgEnrg = getSupportedEnrg(POLL_CODE_READ_TOTAL, version);
+
+    const QStringList lAll = QString("A+,A-,R+,R-").split(",");
+
+    QVariantHash outh;
+
+    for(int i = 0, imax = lAll.size(); i < imax; i++){
+        const QString enrgkey = lAll.at(i);
+        if(!listPlgEnrg.contains(enrgkey) || !listEnrg.contains(enrgkey))
+            continue;
+         const quint64 obis = getObis4energyIndexTotal(i);
+        if(obis < 1)
+            continue;
+
+         quint64 obisTarAdd = 0x0100000000;//01 01 08 00 FF
+        for(int t = 0; t <= trff && t < TRFF_MAX_TARIFFNUMB; t++){
+            const QString enrgkeyFull = QString("T%1_%2").arg(t).arg(enrgkey);
+            outh.insert(enrgkeyFull, obis + obisTarAdd);
+            obisTarAdd += 0x100;
+        }
+    }
+    return outh;
+
+
+
+}
+
+//---------------------------------------------------------------------------------------------------------
+
+quint64 DlmsItronHelper::getObis4energyIndexTotal(const int &indx)
+{
+     quint64 obis = 0;
+    switch(indx){
+    case 0: obis = CMD_GET_ACTIVE_IMPORT_SUMM; break; // A+
+    case 1: obis = CMD_GET_ACTIVE_EXPORT_SUMM; break; //A-
+    case 2: obis = CMD_GET_REACTIVE_RIMPORT_SUMM; break; //R+
+    case 3: obis = CMD_GET_REACTIVE_REXPORT_SUMM; break; //R-
+    }
+    return obis;
+}
+
+void DlmsItronHelper::addTariffAttribute2obisAndAttributeList(ObisList &obislist, AttributeList &attrList, const quint64 &obis, const bool &ask4scallerUnit, const bool &lastIsShortDlms)
+{
+    if(lastIsShortDlms){
+//        addTariffAttribute2obisAndAttributeListSN(obislist, attrList, obis);
+        return;
+    }
+
+    obislist.append(obis);
+    attrList.append(ask4scallerUnit ? 3 : 2);//scaller_unit
+
+//    obislist.append(obis);
+//    attrList.append(2);//value
+
+}
+
+//void DlmsItronHelper::addTariffAttribute2obisAndAttributeListSN(ObisList &obislist, AttributeList &attrList, const quint64 &obis, const bool &ask4scallerUnit)
+//{
+
+//}
 
 
 //---------------------------------------------------------------------------------------------------------

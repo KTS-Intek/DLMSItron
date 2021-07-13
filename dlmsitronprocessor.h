@@ -34,6 +34,7 @@ public:
 
 
     QByteArray crcCalcFrameIItron(const ObisList &obisList, const AttributeList &attributeList) ;
+    QByteArray crcCalcFrameIItronTotalEnrg(const ObisList &obisList, const AttributeList &attributeList) ;
 
     QByteArray crcCalcFrameIarrItron(const QByteArray &arrMessageXtend) ;
 
