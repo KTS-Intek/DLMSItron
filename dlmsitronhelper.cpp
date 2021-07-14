@@ -305,6 +305,72 @@ QVariantHash DlmsItronHelper::getObisCodesTotal4thisMeter(const QVariantHash &ha
 
 //---------------------------------------------------------------------------------------------------------
 
+QVariantHash DlmsItronHelper::getObisCodesVoltage4thisMeter(const QVariantHash &hashConstData, const QString &version)
+{
+    Q_UNUSED(hashConstData);
+    Q_UNUSED(version);
+//    const QStringList lAll = QString("UA,UB,UC,IA,IB,IC,PA,PB,PC,QA,QB,QC,cos_fA,cos_fB,cos_fC,F").split(',');
+
+
+    const quint64 obisTarAdd = 0x0100000000;//01 01 08 00 FF
+    QVariantHash outh;
+    outh.insert("F", CMD_GET_INSTANT_SUMM_FREQUENCY + obisTarAdd);
+
+
+    outh.insert("DLMS_QA"   , CMD_GET_INSTANT_L1_Q_PLUS     + obisTarAdd);
+    outh.insert("QA"   , CMD_GET_INSTANT_L1_Q_MINUS    + obisTarAdd);
+    outh.insert("IA"    , CMD_GET_INSTANT_L1_I          + obisTarAdd);
+    outh.insert("UA"    , CMD_GET_INSTANT_L1_U          + obisTarAdd);
+    outh.insert("cos_fA", CMD_GET_INSTANT_L1_COSF       + obisTarAdd);
+    outh.insert("PA"    , CMD_GET_INSTANT_L1_P_PLUS      + obisTarAdd);
+    outh.insert("DLMS_PA", CMD_GET_INSTANT_L1_P_MINUS     + obisTarAdd);
+
+
+    outh.insert("DLMS_QB"   , CMD_GET_INSTANT_L2_Q_PLUS     + obisTarAdd);
+    outh.insert("QB"   , CMD_GET_INSTANT_L2_Q_MINUS    + obisTarAdd);
+    outh.insert("IB"    , CMD_GET_INSTANT_L2_I          + obisTarAdd);
+    outh.insert("UB"    , CMD_GET_INSTANT_L2_U          + obisTarAdd);
+    outh.insert("cos_fB", CMD_GET_INSTANT_L2_COSF       + obisTarAdd);
+    outh.insert("PB"    , CMD_GET_INSTANT_L2_P_PLUS          + obisTarAdd);
+    outh.insert("DLMS_PB", CMD_GET_INSTANT_L2_P_MINUS     + obisTarAdd);
+
+
+    outh.insert("DLMS_QC"   , CMD_GET_INSTANT_L3_Q_PLUS     + obisTarAdd);
+    outh.insert("QC"   , CMD_GET_INSTANT_L3_Q_MINUS    + obisTarAdd);
+    outh.insert("IC"    , CMD_GET_INSTANT_L3_I          + obisTarAdd);
+    outh.insert("UC"    , CMD_GET_INSTANT_L3_U          + obisTarAdd);
+    outh.insert("cos_fC", CMD_GET_INSTANT_L3_COSF       + obisTarAdd);
+    outh.insert("PC"    , CMD_GET_INSTANT_L3_P_PLUS          + obisTarAdd);
+    outh.insert("DLMS_PC", CMD_GET_INSTANT_L3_P_MINUS     + obisTarAdd);
+
+    return outh;
+
+//#define CMD_GET_INSTANT_SUMM_FREQUENCY          0x01000E0700FF
+//#define CMD_GET_INSTANT_L1_Q_PLUS               0x0100170700FF
+//#define CMD_GET_INSTANT_L1_Q_MINUS              0x0100180700FF
+//#define CMD_GET_INSTANT_L1_I                    0x01001F0700FF
+//#define CMD_GET_INSTANT_L1_U                    0x0100200700FF
+//#define CMD_GET_INSTANT_L1_COSF                 0x0100210700FF
+//#define CMD_GET_INSTANT_L1_P                    0x0100240700FF
+
+//#define CMD_GET_INSTANT_L2_Q_PLUS               0x01002B0700FF
+//#define CMD_GET_INSTANT_L2_Q_MINUS              0x01002C0700FF
+//#define CMD_GET_INSTANT_L2_I                    0x0100330700FF
+//#define CMD_GET_INSTANT_L2_U                    0x0100340700FF
+//#define CMD_GET_INSTANT_L2_COSF                 0x0100350700FF
+//#define CMD_GET_INSTANT_L2_P                    0x0100380700FF
+
+//#define CMD_GET_INSTANT_L3_Q_PLUS               0x01003F0700FF
+//#define CMD_GET_INSTANT_L3_Q_MINUS              0x0100400700FF
+//#define CMD_GET_INSTANT_L3_I                    0x0100470700FF
+//#define CMD_GET_INSTANT_L3_U                    0x0100480700FF
+//#define CMD_GET_INSTANT_L3_COSF                 0x0100490700FF
+//#define CMD_GET_INSTANT_L3_P                    0x01004C0700FF
+
+}
+
+//---------------------------------------------------------------------------------------------------------
+
 quint64 DlmsItronHelper::getObis4energyIndexTotal(const int &indx)
 {
      quint64 obis = 0;
@@ -316,6 +382,8 @@ quint64 DlmsItronHelper::getObis4energyIndexTotal(const int &indx)
     }
     return obis;
 }
+
+//---------------------------------------------------------------------------------------------------------
 
 void DlmsItronHelper::addTariffAttribute2obisAndAttributeList(ObisList &obislist, AttributeList &attrList, const quint64 &obis, const bool &ask4scallerUnit, const bool &lastIsShortDlms)
 {
@@ -330,6 +398,56 @@ void DlmsItronHelper::addTariffAttribute2obisAndAttributeList(ObisList &obislist
 //    obislist.append(obis);
 //    attrList.append(2);//value
 
+}
+
+qreal DlmsItronHelper::getScaller4obisCode(const quint64 &obisCode)
+{
+    const quint64 obisTarAdd = 0x0100000000;//01 01 08 00 FF
+
+
+    qreal scaler = 1.0;
+
+    switch((obisCode - obisTarAdd)){
+
+    case CMD_GET_INSTANT_SUMM_FREQUENCY :                ; break;
+
+    case CMD_GET_INSTANT_L1_Q_PLUS      : scaler =  0.001; break;
+    case CMD_GET_INSTANT_L1_Q_MINUS     : scaler = -0.001; break;
+    case CMD_GET_INSTANT_L1_I           :                ; break;
+    case CMD_GET_INSTANT_L1_U           :                ; break;
+    case CMD_GET_INSTANT_L1_COSF        :                ; break;
+    case CMD_GET_INSTANT_L1_P           : scaler =  0.001; break;
+    case CMD_GET_INSTANT_L1_P_PLUS      : scaler =  0.001; break;
+    case CMD_GET_INSTANT_L1_P_MINUS     : scaler = -0.001; break;
+
+    case CMD_GET_INSTANT_L2_Q_PLUS      : scaler =  0.001; break;
+    case CMD_GET_INSTANT_L2_Q_MINUS     : scaler = -0.001; break;
+    case CMD_GET_INSTANT_L2_I           :                ; break;
+    case CMD_GET_INSTANT_L2_U           :                ; break;
+    case CMD_GET_INSTANT_L2_COSF        :                ; break;
+    case CMD_GET_INSTANT_L2_P           : scaler =  0.001; break;
+    case CMD_GET_INSTANT_L2_P_PLUS      : scaler =  0.001; break;
+    case CMD_GET_INSTANT_L2_P_MINUS     : scaler = -0.001; break;
+
+    case CMD_GET_INSTANT_L3_Q_PLUS      : scaler =  0.001; break;
+    case CMD_GET_INSTANT_L3_Q_MINUS     : scaler = -0.001; break;
+    case CMD_GET_INSTANT_L3_I           :                ; break;
+    case CMD_GET_INSTANT_L3_U           :                ; break;
+    case CMD_GET_INSTANT_L3_COSF        :                ; break;
+    case CMD_GET_INSTANT_L3_P           : scaler =  0.001; break;
+    case CMD_GET_INSTANT_L3_P_PLUS      : scaler =  0.001; break;
+    case CMD_GET_INSTANT_L3_P_MINUS     : scaler = -0.001; break;
+
+
+
+    case CMD_GET_INSTANT_SUMM_I         :                ; break;
+    case CMD_GET_INSTANT_SUMM_U         :                ; break;
+    case CMD_GET_INSTANT_SUMM_COSF      :                ; break;
+    case CMD_GET_INSTANT_SUMM_P         : scaler =  0.001; break;
+
+    }
+
+    return scaler;
 }
 
 //void DlmsItronHelper::addTariffAttribute2obisAndAttributeListSN(ObisList &obislist, AttributeList &attrList, const quint64 &obis, const bool &ask4scallerUnit)

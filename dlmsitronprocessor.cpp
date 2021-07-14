@@ -575,7 +575,7 @@ QVariantHash DlmsItronProcessor::fullCurrent(const QVariantList &meterMessageVar
 
                 if(isValueValid && (obiserr == ERR_DLMS_BAD_REQUEST || obiserr == ERR_DLMS_BAD_REQUEST_2)){//the meter doesn't support this obis code because of its settings
 
-                    updateThisMeterCacheUnsupportedKey(hashConstData, enrgKeyFull);
+                    updateThisMeterCacheUnsupportedTotalEnergKey(hashConstData, enrgKeyFull);
 
                     markThisAsUnsupported(hash, obisCodesHash, obisCodesScallersHash, enrgKeyFull, hashTmpData);
 
@@ -699,6 +699,48 @@ void DlmsItronProcessor::addEnrgKeyTariff2obisListSN(ObisList &obislist, Attribu
 
 QByteArray DlmsItronProcessor::preparyVoltage(const QVariantHash &hashConstData, QVariantHash &hashTmpData)
 {
+    ObisList listCommand;
+    AttributeList listAttribute;
+
+    if(!hashTmpData.value("DLMS_dt_sn_vrsn_ready", false).toBool()){
+        quint8 itronStep = hashTmpData.value("ACE_itronStep", 0).toUInt();
+
+        DlmsItronHelper::addObis4readDtSnVrsnDst(itronStep, listCommand, listAttribute, false, lastExchangeState.lastMeterIsShortDlms); //0x20
+        hashTmpData.insert("ACE_itronStep", itronStep);
+
+        if(!listCommand.isEmpty())
+            return crcCalcFrameIItron(listCommand, listAttribute);
+
+         hashTmpData.insert("DLMS_dt_sn_vrsn_ready", true);
+
+    }
+
+    if(!hashTmpData.contains("ACE_obisCodesHash"))
+        hashTmpData.insert("ACE_obisCodesHash",  DlmsItronHelper::getObisCodesVoltage4thisMeter(hashConstData, hashTmpData.value("vrsn").toString()));
+
+    const QVariantHash obisCodesHash = hashTmpData.value("ACE_obisCodesHash").toHash();
+    const QVariantHash obisCodesScallersHash = hashTmpData.value("ACE_obisCodesScallersHash").toHash();
+
+    if(!obisCodesHash.isEmpty()){
+        auto lk = obisCodesHash.keys();
+        std::sort(lk.begin(), lk.end());
+
+
+        const QString enrgKeyFull = lk.first();
+
+
+        DlmsItronHelper::addTariffAttribute2obisAndAttributeList(listCommand, listAttribute,
+                                                                 obisCodesHash.value(enrgKeyFull).toULongLong(),
+                                                                 (!obisCodesScallersHash.contains(enrgKeyFull)), lastExchangeState.lastMeterIsShortDlms);
+
+         //1. receive scaller unit
+         //2. receive value
+
+
+        hashTmpData.insert("DLMS_enrgKeyFull", enrgKeyFull);
+        return crcCalcFrameIItronTotalEnrg(listCommand, listAttribute);
+    }
+
     return QByteArray();
 }
 
@@ -706,7 +748,144 @@ QByteArray DlmsItronProcessor::preparyVoltage(const QVariantHash &hashConstData,
 
 QVariantHash DlmsItronProcessor::fullVoltage(const QVariantList &meterMessageVar, const quint8 &errCode, quint16 &step, const QVariantHash &hashConstData, const QVariantHash &hashTmpData, const QList<QByteArray> &lastDump, int &warning_counter, int &error_counter)
 {
-    return QVariantHash();
+    Q_UNUSED(errCode);
+    Q_UNUSED(lastDump);
+
+    QVariantHash hash;
+    hash.insert("messFail", true);
+
+    const int meterCount = meterMessageVar.size();
+    const int obisCount = lastExchangeState.lastObisList.size();
+    if(obisCount != meterCount)
+        return hash;
+
+    int goodObis = 0;
+
+//    QString version = hashTmpData.value("vrsn").toString();
+    if(!hashTmpData.value("DLMS_dt_sn_vrsn_ready", false).toBool()){
+        return getDecodedMeterDtSnVrsn(meterMessageVar, hashConstData, hashTmpData, step, warning_counter, error_counter, goodObis);
+
+
+    }
+
+
+    if(meterMessageVar.isEmpty())
+        return hash;
+
+     QVariantHash obisCodesHash = hashTmpData.value("ACE_obisCodesHash").toHash();
+     QVariantHash obisCodesScallersHash = hashTmpData.value("ACE_obisCodesScallersHash").toHash();
+     QVariantHash obis2precision = hashTmpData.value("ACE_obis2precision").toHash();
+
+
+    if(!obisCodesHash.isEmpty()){
+
+        QString enrgKeyFull = hashTmpData.value("DLMS_enrgKeyFull").toString();
+
+        //1. receive scaller unit
+        //2. receive value
+
+        bool isValueValid = false;
+        const quint64 obisCode = obisCodesHash.value(enrgKeyFull).toULongLong();
+
+        if(obisCodesScallersHash.contains(enrgKeyFull)){
+         //this is a value
+
+            qreal val = meterMessageVar.first().toReal(&isValueValid) ;
+            const qreal s = obisCodesScallersHash.value(enrgKeyFull, 0.1).toDouble();
+
+            if(isValueValid){
+
+                const qreal scaler = DlmsItronHelper::getScaller4obisCode(obisCode);
+                int plgPrec = obis2precision.value(QString::number(obisCode)).toInt();
+
+
+                val *= s;
+                val *= scaler;// 0.001 ;//Wh to kWh
+
+
+                if(scaler != 1.0)
+                    plgPrec += 3;
+
+                if(plgPrec < 0)
+                    plgPrec = 0;
+
+
+                QString valStr = PrettyValues::prettyNumber(val, plgPrec, MAX_PLG_PREC);
+                if(verboseMode) qDebug() << "fullCurrent DLMS total value " << val << valStr << s << enrgKeyFull;
+
+
+                if(!valStr.isEmpty() && hashTmpData.contains(QString("DLMS_%1").arg(enrgKeyFull))){
+                    bool ok;
+                    const qreal otherv = hashTmpData.value(QString("DLMS_%1").arg(enrgKeyFull)).toDouble(&ok);
+                    if(ok){
+                        val += otherv;
+                        valStr = PrettyValues::prettyNumber(val, plgPrec, MAX_PLG_PREC);
+                    }
+
+                }
+
+                hash.insert(enrgKeyFull, valStr);
+
+                obisCodesHash.remove(enrgKeyFull);
+
+                hash.insert("ACE_obisCodesHash", obisCodesHash);
+
+
+            }else{
+                if(verboseMode) qDebug() << "fullCurrent bad value " << meterMessageVar.first() << val << s << enrgKeyFull;
+            }
+
+
+        }else{
+            //this  is a scaller unit
+
+            const int s = meterMessageVar.first().toMap().value("0", "NaN").toInt(&isValueValid);//scaler
+            if(isValueValid){
+                const qreal v = qPow(10.0, (qreal)s);
+                if(verboseMode) qDebug() << "fullCurrent obis2scaller " << QString::number(obisCodesHash.value(enrgKeyFull).toInt(), 16) << s << v << enrgKeyFull;
+                obisCodesScallersHash.insert(enrgKeyFull, v);
+                hash.insert("ACE_obisCodesScallersHash", obisCodesScallersHash);
+
+
+                obis2precision.insert(QString::number(obisCode), s * (-1));
+                hash.insert("ACE_obis2precision", obis2precision);
+
+
+            }else{
+                const int obiserr = meterMessageVar.first().toInt(&isValueValid);
+
+                if(isValueValid && (obiserr == ERR_DLMS_BAD_REQUEST || obiserr == ERR_DLMS_BAD_REQUEST_2)){//the meter doesn't support this obis code because of its settings
+
+                    updateThisMeterCacheUnsupportedVoltageKey(hashConstData, enrgKeyFull);
+
+                    markThisAsUnsupported(hash, obisCodesHash, obisCodesScallersHash, enrgKeyFull, hashTmpData);
+                    obis2precision.insert(QString::number(obisCode), 0);
+                    hash.insert("ACE_obis2precision", obis2precision);
+
+                }else
+                    if(verboseMode) qDebug() << "fullCurrent bad scaller_unit " << meterMessageVar.first() << s << isValueValid << enrgKeyFull;
+            }
+        }
+
+        if(isValueValid){
+            hash.insert("messFail", false);
+            getenrgKeyFullCheckedVoltage(hash, obisCodesHash, obisCodesScallersHash, hashConstData, hashTmpData);
+        }
+        hash.insert("DLMS_enrgKeyFull", "");
+
+
+        if(obisCodesHash.isEmpty()){
+            //there is nothing to receive
+            step = 0xFFFF;
+
+        }
+//        return hash;
+
+    }
+
+
+
+    return hash;
 
 }
 
@@ -768,14 +947,28 @@ void DlmsItronProcessor::updateThisMeterCacheLastDt(const QVariantHash &hashCons
 }
 //----------------------------------------------------------------------------------
 
-void DlmsItronProcessor::updateThisMeterCacheUnsupportedKey(const QVariantHash &hashConstData, const QString &enrgKeyFull)
+void DlmsItronProcessor::updateThisMeterCacheUnsupportedTotalEnergKey(const QVariantHash &hashConstData, const QString &enrgKeyFull)
 {
     const QString meterni = hashConstData.value("NI").toString();
     auto onemeter = acecache.value(meterni);
 
-    if(onemeter.lkUnsupported.contains(enrgKeyFull))
+    if(onemeter.lkUnsupportedTotalEnrg.contains(enrgKeyFull))
         return;
-    onemeter.lkUnsupported.append(enrgKeyFull);
+    onemeter.lkUnsupportedTotalEnrg.append(enrgKeyFull);
+
+    acecache.insert(meterni, onemeter);
+}
+
+//----------------------------------------------------------------------------------
+
+void DlmsItronProcessor::updateThisMeterCacheUnsupportedVoltageKey(const QVariantHash &hashConstData, const QString &enrgKeyFull)
+{
+    const QString meterni = hashConstData.value("NI").toString();
+    auto onemeter = acecache.value(meterni);
+
+    if(onemeter.lkUnsupportedVoltage.contains(enrgKeyFull))
+        return;
+    onemeter.lkUnsupportedVoltage.append(enrgKeyFull);
 
     acecache.insert(meterni, onemeter);
 }
@@ -807,7 +1000,7 @@ void DlmsItronProcessor::getenrgKeyFullCheckedTotal(QVariantHash &hash, QVariant
     const QString meterni = hashConstData.value("NI").toString();
     auto onemeter = acecache.value(meterni);
 
-    if(onemeter.lkUnsupported.isEmpty())
+    if(onemeter.lkUnsupportedTotalEnrg.isEmpty())
         return;
 
 
@@ -826,11 +1019,46 @@ void DlmsItronProcessor::getenrgKeyFullCheckedTotal(QVariantHash &hash, QVariant
 
         for(int i = 0, imax = lk.size(); i < imax; i++){
          const QString enrgKeyFull = lk.at(i);
-            if(onemeter.lkUnsupported.contains(enrgKeyFull)){
+            if(onemeter.lkUnsupportedTotalEnrg.contains(enrgKeyFull)){
                 obisCodesHash.remove(enrgKeyFull);
                 markThisAsUnsupported(hash, obisCodesHash, obisCodesScallersHash, enrgKeyFull, hashTmpData);
 
             }
+        }
+    }
+
+}
+
+//----------------------------------------------------------------------------------
+
+void DlmsItronProcessor::getenrgKeyFullCheckedVoltage(QVariantHash &hash, QVariantHash &obisCodesHash, QVariantHash &obisCodesScallersHash, const QVariantHash &hashConstData, const QVariantHash &hashTmpData)
+{
+    if(hashTmpData.value("ACE_enrgKeyFullChecked", false).toBool())
+        return;
+
+    const QString meterni = hashConstData.value("NI").toString();
+    auto onemeter = acecache.value(meterni);
+
+    if(onemeter.lkUnsupportedVoltage.isEmpty())
+        return;
+
+
+    auto lk = obisCodesHash.keys();
+    if(lk.isEmpty())
+        return;
+
+    std::sort(lk.begin(), lk.end());
+
+    //check it once, after all necessary T0 are received
+    hash.insert("ACE_enrgKeyFullChecked", true);
+
+
+    for(int i = 0, imax = lk.size(); i < imax; i++){
+        const QString enrgKeyFull = lk.at(i);
+        if(onemeter.lkUnsupportedVoltage.contains(enrgKeyFull)){
+            obisCodesHash.remove(enrgKeyFull);
+            markThisAsUnsupported(hash, obisCodesHash, obisCodesScallersHash, enrgKeyFull, hashTmpData);
+
         }
     }
 

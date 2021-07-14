@@ -15,7 +15,9 @@ public:
 
     struct ACECachedThings
     {
-        QStringList lkUnsupported;
+        QStringList lkUnsupportedTotalEnrg;
+        QStringList lkUnsupportedVoltage;
+
         QDateTime lastDt;
 
         ACECachedThings() {}
@@ -112,12 +114,17 @@ public:
 
     void updateThisMeterCacheLastDt(const QVariantHash &hashConstData);
 
-    void updateThisMeterCacheUnsupportedKey(const QVariantHash &hashConstData, const QString &enrgKeyFull);
+    void updateThisMeterCacheUnsupportedTotalEnergKey(const QVariantHash &hashConstData, const QString &enrgKeyFull);
+
+    void updateThisMeterCacheUnsupportedVoltageKey(const QVariantHash &hashConstData, const QString &enrgKeyFull);
+
 
     void markThisAsUnsupported(QVariantHash &hash, QVariantHash &obisCodesHash, QVariantHash &obisCodesScallersHash, const QString &enrgKeyFull, const QVariantHash &hashTmpData);
 
 
     void getenrgKeyFullCheckedTotal(QVariantHash &hash, QVariantHash &obisCodesHash, QVariantHash &obisCodesScallersHash, const QVariantHash &hashConstData, const QVariantHash &hashTmpData);
+
+    void getenrgKeyFullCheckedVoltage(QVariantHash &hash, QVariantHash &obisCodesHash, QVariantHash &obisCodesScallersHash, const QVariantHash &hashConstData, const QVariantHash &hashTmpData);
 
 //    QByteArray preparyLoadProfile(const QVariantHash &hashConstData, QVariantHash &hashTmpData);
 

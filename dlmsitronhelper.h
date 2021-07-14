@@ -34,6 +34,9 @@ public:
 
     static QVariantHash getObisCodesTotal4thisMeter(const QVariantHash &hashConstData, const QString &version);
 
+    static QVariantHash getObisCodesVoltage4thisMeter(const QVariantHash &hashConstData, const QString &version);
+
+
     static quint64 getObis4energyIndexTotal(const int &indx);
 
     static void addTariffAttribute2obisAndAttributeList(ObisList &obislist, AttributeList &attrList, const quint64 &obis, const bool &ask4scallerUnit, const bool &lastIsShortDlms);
@@ -41,6 +44,7 @@ public:
 //    static void addTariffAttribute2obisAndAttributeListSN(ObisList &obislist, AttributeList &attrList, const quint64 &obis, const bool &ask4scallerUnit);
 
 
+    static qreal getScaller4obisCode(const quint64 &obisCode);
 
 };
 
