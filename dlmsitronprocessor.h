@@ -13,6 +13,18 @@ class DlmsItronProcessor : public DlmsProcessor
 public:
     explicit DlmsItronProcessor(QObject *parent = nullptr);
 
+    struct ACECachedThings
+    {
+        QStringList lkUnsupported;
+        QDateTime lastDt;
+
+        ACECachedThings() {}
+    };
+
+    QHash<QString, ACECachedThings> acecache;
+
+
+
     bool isAShortNameMeter(const QString &version);
 
 
@@ -96,7 +108,16 @@ public:
     void preparyWriteDT(QVariantHash &hashMessage);
 
 
+    QVariantHash getDecodedMeterDtSnVrsn(const QVariantList &meterMessageVar, const QVariantHash &hashConstData, const QVariantHash &hashTmpData, quint16 &step, int &warning_counter, int &error_counter, int &goodObis);
 
+    void updateThisMeterCacheLastDt(const QVariantHash &hashConstData);
+
+    void updateThisMeterCacheUnsupportedKey(const QVariantHash &hashConstData, const QString &enrgKeyFull);
+
+    void markThisAsUnsupported(QVariantHash &hash, QVariantHash &obisCodesHash, QVariantHash &obisCodesScallersHash, const QString &enrgKeyFull, const QVariantHash &hashTmpData);
+
+
+    void getenrgKeyFullCheckedTotal(QVariantHash &hash, QVariantHash &obisCodesHash, QVariantHash &obisCodesScallersHash, const QVariantHash &hashConstData, const QVariantHash &hashTmpData);
 
 //    QByteArray preparyLoadProfile(const QVariantHash &hashConstData, QVariantHash &hashTmpData);
 
