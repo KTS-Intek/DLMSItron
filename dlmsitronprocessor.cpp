@@ -893,7 +893,7 @@ QVariantHash DlmsItronProcessor::fullVoltage(const QVariantList &meterMessageVar
 
 void DlmsItronProcessor::preparyWriteDT(QVariantHash &hashMessage)
 {
-//    192.168.88.41  > 20:18:17.506 7E A0 28 02 23 03 DC 5C AE E6 E6 00 C1 01 C1 00 ~.(.#..\
+//    192.168.88.41  > 20:18:17.506 7E A0 28 02 23 03 DC 5C AE E6 E6 00 C1 01 C1 00 ~.(.#..
 //                                   08 00 00 01 00 00 FF 02 00 09 0C 07 E5 07 07 FF
 //                                   14 12 11 FF FF 4C 80 01 67 7E
     hashMessage.insert("message_0",
